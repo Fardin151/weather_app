@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'weather_service.dart';
+import 'package:provider/provider.dart';
+import 'theme_provider.dart';
 
 class WeatherScreen extends StatefulWidget {
   const WeatherScreen({super.key});
@@ -25,11 +28,13 @@ class _WeatherScreenState extends State<WeatherScreen> {
   bool isLoading = true;
   String errorMessage = '';
   final TextEditingController _searchController = TextEditingController();
+  List<String> favoriteCities = [];
 
   @override
   void initState() {
     super.initState();
     loadWeather();
+    loadFavorites();
   }
 
   @override
@@ -107,6 +112,55 @@ class _WeatherScreenState extends State<WeatherScreen> {
     }
   }
 
+  Future<void> loadFavorites() async {
+  final prefs = await SharedPreferences.getInstance();
+  setState(() {
+    favoriteCities = prefs.getStringList('favorites') ?? [];
+  });
+}
+
+Future<void> toggleFavorite() async {
+  final prefs = await SharedPreferences.getInstance();
+  setState(() {
+    if (favoriteCities.contains(cityName)) {
+      favoriteCities.remove(cityName);
+    } else {
+      favoriteCities.add(cityName);
+    }
+  });
+  await prefs.setStringList('favorites', favoriteCities);
+}
+
+Future<void> loadCityFromFavorite(String city) async {
+  setState(() {
+    isLoading = true;
+    errorMessage = '';
+  });
+
+  try {
+    final data = await _weatherService.fetchWeatherByCity(city);
+    setState(() {
+      cityName = data['name'];
+      temperature = data['main']['temp'].toDouble();
+      feelsLike = data['main']['feels_like'].toDouble();
+      tempMin = data['main']['temp_min'].toDouble();
+      tempMax = data['main']['temp_max'].toDouble();
+      humidity = data['main']['humidity'];
+      windSpeed = data['wind']['speed'].toDouble();
+      condition = data['weather'][0]['description'];
+      iconCode = data['weather'][0]['icon'];
+      sunrise = _formatTime(data['sys']['sunrise']);
+      sunset = _formatTime(data['sys']['sunset']);
+      isLoading = false;
+    });
+  } catch (e) {
+    setState(() {
+      errorMessage = e.toString();
+      isLoading = false;
+    });
+  }
+}
+
   List<Color> _getGradientColors(String condition) {
   final c = condition.toLowerCase();
 
@@ -142,14 +196,18 @@ class _WeatherScreenState extends State<WeatherScreen> {
       width: double.infinity,
       height: double.infinity,
       decoration: BoxDecoration(
-      gradient: LinearGradient(
-        colors: condition.isEmpty
-            ? [const Color(0xFF1a1a2e), const Color(0xFF16213e), const Color(0xFF0f3460)]
-            : _getGradientColors(condition),
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
+        gradient: LinearGradient(
+          colors: Theme.of(context).brightness == Brightness.dark
+              ? _getGradientColors(condition)
+              : [
+                  const Color.fromARGB(255, 11, 15, 19),
+                  const Color.fromARGB(255, 0, 1, 2),
+                  const Color.fromARGB(255, 0, 0, 0),
+                ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
       ),
-    ),
         child: SafeArea(
           child: isLoading
 
@@ -233,17 +291,88 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
                           const SizedBox(height: 30),
 
-                          // City Name
-                          Text(
-                            cityName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 36,
-                              fontWeight: FontWeight.bold,
-                            ),
+                          // City Name + Favorite Button
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                cityName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 36,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                onPressed: toggleFavorite,
+                                icon: Icon(
+                                  favoriteCities.contains(cityName)
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  color: Colors.redAccent,
+                                  size: 28,
+                                ),
+                              ),
+                            ],
                           ),
 
+                          // Favorites List
+                          if (favoriteCities.isNotEmpty)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'FAVORITES',
+                                    style: TextStyle(
+                                      color: Colors.white54,
+                                      fontSize: 12,
+                                      letterSpacing: 2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    children: favoriteCities.map((city) {
+                                      return GestureDetector(
+                                        onTap: () => loadCityFromFavorite(city),
+                                        child: Chip(
+                                          label: Text(city),
+                                          backgroundColor: Colors.white24,
+                                          labelStyle: const TextStyle(color: Colors.white),
+                                          deleteIcon: const Icon(Icons.close, size: 14, color: Colors.white70),
+                                          onDeleted: () async {
+                                            final prefs = await SharedPreferences.getInstance();
+                                            setState(() {
+                                              favoriteCities.remove(city);
+                                            });
+                                            await prefs.setStringList('favorites', favoriteCities);
+                                          },
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ),
+                            ),
+
                           const SizedBox(height: 10),
+
+                          IconButton(
+                            icon: Icon(
+                              Theme.of(context).brightness == Brightness.dark
+                                  ? Icons.light_mode
+                                  : Icons.dark_mode,
+                              color: Colors.white,
+                            ),
+                            onPressed: () {
+                              final isDark =
+                                  Theme.of(context).brightness != Brightness.dark;
+                              context.read<ThemeProvider>().toggleTheme(isDark);
+                            },
+                          ),
 
                           // Weather Icon
                           Image.network(
