@@ -15,6 +15,11 @@ class _WeatherScreenState extends State<WeatherScreen> {
   String condition = '';
   String iconCode = '';
   double temperature = 0;
+  double feelsLike = 0;
+  double tempMin = 0;
+  double tempMax = 0;
+  String sunrise = '';
+  String sunset = '';
   int humidity = 0;
   double windSpeed = 0;
   bool isLoading = true;
@@ -46,8 +51,13 @@ class _WeatherScreenState extends State<WeatherScreen> {
       setState(() {
         cityName = data['name'];
         temperature = data['main']['temp'].toDouble();
+        feelsLike = data['main']['feels_like'].toDouble();
+        tempMin = data['main']['temp_min'].toDouble();
+        tempMax = data['main']['temp_max'].toDouble();
         humidity = data['main']['humidity'];
         windSpeed = data['wind']['speed'].toDouble();
+        sunrise = _formatTime(data['sys']['sunrise']);
+        sunset = _formatTime(data['sys']['sunset']);
         condition = data['weather'][0]['description'];
         iconCode = data['weather'][0]['icon'];
         isLoading = false;
@@ -58,6 +68,14 @@ class _WeatherScreenState extends State<WeatherScreen> {
         isLoading = false;
       });
     }
+  }
+
+  String _formatTime(int unixTime) {
+    final dt = DateTime.fromMillisecondsSinceEpoch(unixTime * 1000);
+    final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
+    final minute = dt.minute.toString().padLeft(2, '0');
+    final period = dt.hour >= 12 ? 'PM' : 'AM';
+    return '$hour:$minute $period';
   }
 
   @override
@@ -130,6 +148,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                         ),
 
                         // Condition
+                        // Condition
                         Text(
                           condition.toUpperCase(),
                           style: const TextStyle(
@@ -139,31 +158,61 @@ class _WeatherScreenState extends State<WeatherScreen> {
                           ),
                         ),
 
+                        const SizedBox(height: 8),
+
+                        // Feels Like
+                        Text(
+                          'Feels like ${feelsLike.toStringAsFixed(1)}°C',
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 16,
+                          ),
+                        ),
+
+                        const SizedBox(height: 6),
+
+                        // Min / Max
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              '↓ ${tempMin.toStringAsFixed(1)}°C',
+                              style: const TextStyle(
+                                color: Colors.lightBlueAccent,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(width: 20),
+                            Text(
+                              '↑ ${tempMax.toStringAsFixed(1)}°C',
+                              style: const TextStyle(
+                                color: Colors.orangeAccent,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+
                         const SizedBox(height: 40),
 
-                        // Humidity and Wind Row
+                        // Humidity, Wind, Sunrise, Sunset Row
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             // Humidity
                             Column(
                               children: [
-                                const Icon(Icons.water_drop,
-                                    color: Colors.lightBlueAccent),
+                                const Icon(Icons.water_drop, color: Colors.lightBlueAccent),
                                 const SizedBox(height: 6),
                                 Text(
                                   '$humidity%',
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 18),
+                                  style: const TextStyle(color: Colors.white, fontSize: 18),
                                 ),
-                                const Text(
-                                  'Humidity',
-                                  style: TextStyle(color: Colors.white54),
-                                ),
+                                const Text('Humidity', style: TextStyle(color: Colors.white54)),
                               ],
                             ),
 
-                            const SizedBox(width: 60),
+                            const SizedBox(width: 40),
 
                             // Wind Speed
                             Column(
@@ -172,13 +221,39 @@ class _WeatherScreenState extends State<WeatherScreen> {
                                 const SizedBox(height: 6),
                                 Text(
                                   '${windSpeed.toStringAsFixed(1)} m/s',
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 18),
+                                  style: const TextStyle(color: Colors.white, fontSize: 18),
                                 ),
-                                const Text(
-                                  'Wind',
-                                  style: TextStyle(color: Colors.white54),
+                                const Text('Wind', style: TextStyle(color: Colors.white54)),
+                              ],
+                            ),
+
+                            const SizedBox(width: 40),
+
+                            // Sunrise
+                            Column(
+                              children: [
+                                const Icon(Icons.wb_twilight, color: Colors.orangeAccent),
+                                const SizedBox(height: 6),
+                                Text(
+                                  sunrise,
+                                  style: const TextStyle(color: Colors.white, fontSize: 18),
                                 ),
+                                const Text('Sunrise', style: TextStyle(color: Colors.white54)),
+                              ],
+                            ),
+
+                            const SizedBox(width: 40),
+
+                            // Sunset
+                            Column(
+                              children: [
+                                const Icon(Icons.nights_stay, color: Colors.orangeAccent),
+                                const SizedBox(height: 6),
+                                Text(
+                                  sunset,
+                                  style: const TextStyle(color: Colors.white, fontSize: 18),
+                                ),
+                                const Text('Sunset', style: TextStyle(color: Colors.white54)),
                               ],
                             ),
                           ],
